@@ -3,15 +3,13 @@ const http = require('http');
 const Koa = require('koa');
 const koaBody = require('koa-body');
 const WS = require('ws');
-// const { v4: uuidv4 } = require('uuid');
-// const Router = require('koa-router');
+const { v4: uuidv4 } = require('uuid');
 const router = require('./routes/index');
+const sign = require('./sign/sign');
 
 const app = new Koa();
 
 app.use(koaBody({
-  // urlencoded: true,
-  // multipart: true,
   json: true,
 }));
 
@@ -51,26 +49,85 @@ app.use(async (ctx, next) => {
 // further my code
 
 app.use(router());
-
-const chat = [];
+const messages = [];
+const clients = {};
 
 const port = process.env.PORT || 8080;
-// const server = http.createServer(app.callback()).listen(8080);
 const server = http.createServer(app.callback());
 const wsServer = new WS.Server({ // создаем сервер ws на базе нашего сервера http
   server,
 });
 
 wsServer.on('connection', (ws) => { // подписываемся на событе 'connection', сработает когда произошло соединение
-  const errCallback = (e) => { console.log('Из события connection', e); };
+  // console.log('connection', wsServer.clients);
+  const errCallback = (e) => { console.log('errCallback', e); };
   ws.on('message', (e) => { // подписываемся на событие message, сработает когда придет сообщение на сервер. Сообщение находится в 'e'
-    console.log('Из события message', e);
-    ws.send('привет от сервера');
-    //   chat.push(e);
-
-  //   Array.from(wsServer.clients)
-  //     .filter((client) => client.readyState === WS.OPEN)
-  //     .forEach((client) => client.send(JSON.stringify({ message: e }))); // рассылаем сообщение всем подключенным участникам чата
+    const { action } = JSON.parse(e);
+    console.log('action', action);
+    if (action === 'signIn') { // Ниже логика регистрации пользоватеоя в чате
+      const { login } = JSON.parse(e);
+      if (!sign.contains(login)) {
+        const activeUsers = sign.add(login);
+        Array.from(wsServer.clients)
+          .filter((client) => client.readyState === WS.OPEN)
+          .forEach((client) => client.send(JSON.stringify({
+            action: 'signIn',
+            response: {
+              status: 'ok',
+              activeUsers,
+              login,
+              allMessages: messages,
+            },
+          })));
+        clients[login] = ws;
+        console.log('mesage', clients);
+      } else {
+        ws.send(JSON.stringify({
+          action: 'signIn',
+          response: {
+            status: 'error',
+          },
+        }));
+      }
+    }
+    if (action === 'postMessage') { // Ниже логика рассылки сообщения
+      const { login, message, dateMessage } = JSON.parse(e);
+      messages.push(JSON.parse(e));
+      Array.from(wsServer.clients)
+        .filter((client) => client.readyState === WS.OPEN)
+        .forEach((client) => client.send(JSON.stringify({
+          action: 'postMessage',
+          response: {
+            status: 'ok',
+            message,
+            dateMessage,
+            login,
+          },
+        })));
+    }
+    if (action === 'allMessage') {
+      ws.send(messages);
+    }
+  });
+  ws.on('close', (e) => {
+    for (const us in clients) {
+      if (clients[us] === ws) {
+        const login = us;
+        const activeUsers = sign.remove(us);
+        Array.from(wsServer.clients)
+          .filter((client) => client.readyState === WS.OPEN)
+          .forEach((client) => client.send(JSON.stringify({
+            action: 'signIn',
+            response: {
+              status: 'ok',
+              activeUsers,
+              login,
+              allMessages: messages,
+            },
+          })));
+        console.log('close______________', us);
+      }
+    }
   });
   // ws.send(JSON.stringify({ chat }), errCallback); // при первом подключении передаем чат целиком
 });
@@ -78,3 +135,5 @@ wsServer.on('connection', (ws) => { // подписываемся на собы�
 server.listen(port);
 
 // id: uuidv4()
+// module.exports = server;
+// module.exports = wsServer;
