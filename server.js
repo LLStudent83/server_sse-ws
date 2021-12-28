@@ -3,7 +3,6 @@ const http = require('http');
 const Koa = require('koa');
 const koaBody = require('koa-body');
 const WS = require('ws');
-const { v4: uuidv4 } = require('uuid');
 const router = require('./routes/index');
 const sign = require('./sign/sign');
 
@@ -59,7 +58,7 @@ const wsServer = new WS.Server({ // создаем сервер ws на базе
 });
 
 wsServer.on('connection', (ws) => { // подписываемся на событе 'connection', сработает когда произошло соединение
-  // console.log('connection', wsServer.clients);
+  // eslint-disable-next-line no-unused-vars
   const errCallback = (e) => { console.log('errCallback', e); };
   ws.on('message', (e) => { // подписываемся на событие message, сработает когда придет сообщение на сервер. Сообщение находится в 'e'
     const { action } = JSON.parse(e);
@@ -109,7 +108,7 @@ wsServer.on('connection', (ws) => { // подписываемся на собы�
       ws.send(messages);
     }
   });
-  ws.on('close', (e) => {
+  ws.on('close', () => {
     for (const us in clients) {
       if (clients[us] === ws) {
         const login = us;
@@ -129,11 +128,6 @@ wsServer.on('connection', (ws) => { // подписываемся на собы�
       }
     }
   });
-  // ws.send(JSON.stringify({ chat }), errCallback); // при первом подключении передаем чат целиком
 });
 
 server.listen(port);
-
-// id: uuidv4()
-// module.exports = server;
-// module.exports = wsServer;
