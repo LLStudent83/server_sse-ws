@@ -124,7 +124,7 @@ wsServer.on('connection', (ws) => { // подписываемся на собы�
               allMessages: messages,
             },
           })));
-        console.log('close______________', us);
+        console.log('close__________', us);
       }
     }
   });
